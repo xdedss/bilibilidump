@@ -15,22 +15,11 @@ from simpleDB import SimpleDB
 
 commentsCache = {}
 
-
+# 能爬的主分区id
 tids = [1, 13, 167, 3, 129, 4, 36, 188, 160, 211, 217, 119, 155, 5, 181, 177, 23, 11]
 
-#def comment_hash(comment):
-#    return str(comment['time']) + '_' + str(comment['mid']) + '_' + str(comment['floor'])
-#
-#def sprint_comment(comment, colorful=False):
-#    tstr = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(int(comment['time'])))
-#    content = '\n' + comment['content'] if ('\n' in comment['content']) else comment['content']
-#    if colorful:
-#        return ('%s %s %s %s' % (cf.red('#' + str(comment['floor'])), cf.yellow(tstr), cf.cyan('%s (%s):' % (comment['username'], comment['mid'])), content))
-#    else:
-#        return ('%s %s %s %s' % (('#' + str(comment['floor'])), (tstr), ('%s (%s):' % (comment['username'], comment['mid'])), content))
 
-
-
+# 获取单个视频的前5页热评及其回复(id, content)
 def dump_comment(aid=None, bvid=None, mode=0, maxp=5):
     res = []
     vid_info = bq.vid_info(aid, bvid)
@@ -44,11 +33,13 @@ def dump_comment(aid=None, bvid=None, mode=0, maxp=5):
                 res.append((reply['id'], reply['content']))
     return res
 
+# 从数据库导出文本
 def dump_db(tid=1):
     db = SimpleDB('bili_comments.db')
     comments = db.query("SELECT content FROM Comments WHERE tid = %s " % (tid, ))
     return '\n'.join([unquote(comment[0]) for comment in comments])
 
+# 循环爬取 interval分钟间隔
 def scrap_start(interval=10):
     db = SimpleDB('bili_comments.db')
     db.execute("CREATE TABLE IF NOT EXISTS Comments (id INT PRIMARY KEY, tid INT, content TEXT)")
@@ -57,18 +48,18 @@ def scrap_start(interval=10):
         # main loop
         for tid in tids:
             print('----------checking tid %s-----------' % tid)
-            aids = bq.rank(tid)
+            aids = bq.rank(tid) # 热门视频
             print(aids)
             for aid in aids:
                 print('----aid=%s----' % aid)
                 if (len(db.query("SELECT id FROM Videos WHERE id = %s " % (aid, )))==0):
                     db.execute("INSERT INTO Videos VALUES (%s, %s)" % (aid, tid))
-                comments = dump_comment(aid=aid, mode=0)
+                comments = dump_comment(aid=aid, mode=0) # 热门评论
                 print('%s comments found' % len(comments))
                 comment_count = 0
                 for rpid, comment in comments:
                     old = db.query("SELECT id FROM Comments WHERE id = %s " % (rpid, ))
-                    if (len(old) == 0):
+                    if (len(old) == 0): # 去重
                         comment_count += 1
                         print('%s new comments           ' % comment_count, end = '\r')
                         #print('[comment]' + comment)
