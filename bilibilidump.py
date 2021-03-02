@@ -66,7 +66,7 @@ def scrap_start(interval=10):
                         db.execute("INSERT INTO Comments VALUES (%s, %s, '%s')" % (rpid, tid, quote(comment)))
                 print()
                 time.sleep(3)
-        for i in range(interval):
+        for i in range(int(interval)):
             print('wait %s/%s min...' % (i + 1, interval))
             time.sleep(60)
 
