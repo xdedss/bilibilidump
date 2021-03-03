@@ -16,17 +16,22 @@ from simpleDB import SimpleDB
 commentsCache = {}
 
 # 能爬的主分区id
-tids = [1, 13, 167, 3, 129, 4, 36, 188, 160, 211, 217, 119, 155, 5, 181, 177, 23, 11]
+# tids = [1, 13, 167, 3, 129, 4, 36, 188, 160, 211, 217, 119, 155, 5, 181, 177, 23, 11]
+tids = [1, 3, 129, 4, 36, 188, 160, 211, 217, 119, 155, 5, 181]
+# tids = [155, 5, 181]
 
 
 # 获取单个视频的前5页热评及其回复(id, content)
 def dump_comment(aid=None, bvid=None, mode=0, maxp=5):
     res = []
     vid_info = bq.vid_info(aid, bvid)
+    if (vid_info == None):
+        return res
     num_reply = vid_info['stat']['reply']
     num_page = math.ceil(num_reply / 20)
     for page in range(min(num_page, maxp)):
         comments = bq.comments(vid_info['aid'], page=page, mode=mode)
+        time.sleep(0.3) # slow down
         for comment in comments:
             res.append((comment['id'], comment['content']))
             for reply in comment['replies']:
@@ -48,11 +53,13 @@ def scrap_start(interval=10):
         # main loop
         for tid in tids:
             print('----------checking tid %s-----------' % tid)
-            aids = bq.rank(tid) # 热门视频
+            aids = bq.rank(tid, day=3) # 热门视频
+            time.sleep(1)
             print(aids)
             for aid in aids:
                 print('----aid=%s----' % aid)
                 if (len(db.query("SELECT id FROM Videos WHERE id = %s " % (aid, )))==0):
+                    print('(new video)')
                     db.execute("INSERT INTO Videos VALUES (%s, %s)" % (aid, tid))
                 comments = dump_comment(aid=aid, mode=0) # 热门评论
                 print('%s comments found' % len(comments))
@@ -66,6 +73,9 @@ def scrap_start(interval=10):
                         db.execute("INSERT INTO Comments VALUES (%s, %s, '%s')" % (rpid, tid, quote(comment)))
                 print()
                 time.sleep(3)
+            time.sleep(5)
+        if (int(interval) == 0):
+            break
         for i in range(int(interval)):
             print('wait %s/%s min...' % (i + 1, interval))
             time.sleep(60)
@@ -74,7 +84,7 @@ def scrap_start(interval=10):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('action', metavar='action', help='fetch=爬取  dump=输出到文件')
-    parser.add_argument('-t', '--time', dest='time', default=1, type=float, help='自定义评论获取间隔时间（分钟）（仅fetch）')
+    parser.add_argument('-t', '--time', dest='time', default=600, type=float, help='自定义评论获取间隔时间（分钟），0表示不循环（仅fetch）')
     parser.add_argument('-f', '--file', dest='fname', default='dump.txt', help='将结果写入文件（仅dump）')
     parser.add_argument('-c', '--category', dest='tid', default='0', type=int, help='分区id（仅dump）')
     args = parser.parse_args()
