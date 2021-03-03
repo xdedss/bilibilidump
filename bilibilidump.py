@@ -6,7 +6,7 @@ import jieba.posseg as pseg
 
 import json, re
 import argparse
-import time, datetime, math, codecs, sys, requests, sqlite3
+import time, datetime, math, codecs, sys, os, requests, sqlite3, random
 from urllib.parse import quote, unquote
 
 import bilibiliquery as bq
@@ -16,8 +16,7 @@ commentsCache = {}
 
 # 能爬的主分区id
 # tids = [1, 13, 167, 3, 129, 4, 36, 188, 160, 211, 217, 119, 155, 5, 181, 177, 23, 11]
-tids = [1, 3, 129, 4, 36, 188, 160, 211, 217, 119, 155, 5, 181]
-# tids = [155, 5, 181]
+valid_tids = [1, 3, 129, 4, 36, 188, 160, 211, 217, 119, 155, 5, 181]
 
 
 # 获取单个视频的前5页热评及其回复(id, content)
@@ -37,7 +36,7 @@ def dump_comment(aid=None, bvid=None, mode=0, maxp=5):
                 res.append((reply['id'], reply['content']))
     return res
 
-# 从数据库导出文本
+# 从数据库导出文本分词
 def dump_db(fname, tid=1):
     db = SimpleDB('bili_comments.db')
     if (tid == 0):
@@ -55,6 +54,20 @@ def dump_db(fname, tid=1):
     
     db.close()
 
+# 导出专栏文本分词
+def dump_articles_db(fname):
+    db = SimpleDB('bili_articles.db')
+    articles = db.iterate("SELECT content FROM Articles")
+    article_count = 0
+    with open(fname,'bw') as f:
+        for article in articles:
+            article_count += 1
+            if (article_count % 10 == 0):
+                print('%s articles dumped           ' % article_count, end='\r')
+            f.write((unquote(article[0]) + '\n').encode('utf-8'))
+        print('%s articles dumped           ' % article_count)
+    db.close()
+
 # 单句分词
 def cut_words(sentence):
     #print sentence
@@ -63,8 +76,9 @@ def cut_words(sentence):
 # 整个文件分词
 def process_dump(fname):
     print('word separation...')
+    target_fname = '%s-seg.txt' % ('.'.join(fname.split('.')[:-1]))
     f = codecs.open(fname, 'r', encoding="utf8")
-    target = codecs.open('%s-seg.txt' % ('.'.join(fname.split('.')[:-1])), 'w', encoding="utf8")
+    target = codecs.open(target_fname, 'w', encoding="utf8")
     line_num = 1
     line = f.readline()
     while line:
@@ -76,9 +90,12 @@ def process_dump(fname):
     print('%s lines processed            ' % (line_num-1))
     f.close()
     target.close()
+    os.remove(fname)
+    os.rename(target_fname, fname)
 
-# 循环爬取 interval分钟间隔
-def scrap_start(interval=10):
+# 循环爬取热门视频评论 interval分钟间隔
+# 加大量sleep是防ban，完整爬一遍所有分区大概要一下午吧
+def scrap_start(tids, interval=10):
     db = SimpleDB('bili_comments.db')
     db.execute("CREATE TABLE IF NOT EXISTS Comments (id INT PRIMARY KEY, tid INT, content TEXT)")
     db.execute("CREATE TABLE IF NOT EXISTS Videos (id INT PRIMARY KEY, tid INT)")
@@ -113,24 +130,57 @@ def scrap_start(interval=10):
             print('wait %s/%s min...' % (i + 1, interval))
             time.sleep(60)
 
+# 循环爬取推荐专栏
+# 专栏推荐可以无限刷，但是刷来刷去也就那120个专栏来回重复 最好隔一段时间再刷一次
+def scrap_article_start():
+    db = SimpleDB('bili_articles.db')
+    db.execute("CREATE TABLE IF NOT EXISTS Articles (id INT PRIMARY KEY, content TEXT)")
+    while True:
+        articles = bq.article_suggestions()
+        print(articles)
+        time.sleep(2)
+        for article in articles:
+            print('cv%s' % (article, ))
+            if (len(db.query("SELECT id FROM Articles WHERE id = %s " % (article, ))) == 0):
+                content = bq.article_text(article)
+                if (content == ''):
+                    continue
+                print('(new article)')
+                db.execute("INSERT INTO Articles VALUES (%s, '%s')" % (article, quote(content)))
+                time.sleep(2 + random.random() * 2)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', metavar='action', help='fetch=爬取  dump=输出到文件')
-    parser.add_argument('-t', '--time', dest='time', default=0, type=int, help='自定义评论获取间隔时间（分钟），0表示不循环')
-    parser.add_argument('-f', '--file', dest='fname', default='dump.txt', help='将结果写入文件（仅dump）')
-    parser.add_argument('-c', '--category', dest='tid', default=0, type=int, help='分区id（仅dump）')
+    parser.add_argument('action', metavar='action', help='fetch=爬取热门视频评论区 fetcharticles=爬取推荐专栏文本  dump=输出评论到文件 dumparticles=输出专栏')
+    parser.add_argument('-t', '--time', dest='time', default=0, type=int, help='自定义评论获取循环间隔时间（分钟），默认为0表示不循环')
+    parser.add_argument('-f', '--file', dest='fname', default='dump.txt', help='将结果写入文件时的文件名，默认dump.txt')
+    parser.add_argument('-c', '--category', dest='tid', default=0, type=int, help='要爬取或者导出的分区id，默认为0表示所有')
     args = parser.parse_args()
     
     fetch = args.action != 'dump'
     
-    if (fetch):
+    if (args.action == 'fetch'):
         fetch_interval = args.time
-        scrap_start(fetch_interval)
-    else:
+        if (args.tid != 0):
+            if (not args.tid in valid_tids):
+                print('invalid tid')
+                print('choose from %s' % (valid_tids, ))
+                exit()
+            tids = [args.tid]
+        else:
+            tids = valid_tids
+        scrap_start(tids, fetch_interval)
+    elif (args.action == 'dump'):
         fname = args.fname
         tid = args.tid
         dump_db(fname, tid)
         process_dump(fname)
-
+    elif (args.action == 'fetcharticles'):
+        scrap_article_start()
+    elif (args.action == 'dumparticles'):
+        fname = args.fname
+        dump_articles_db(fname)
+        process_dump(fname)
+    else:
+        print('invalid action')
 

@@ -3,6 +3,7 @@ import requests
 import math, time
 import json, re
 
+from pyquery import PyQuery as pq
 
 
 def pick(dic, keys):
@@ -50,7 +51,7 @@ def vid_info(aid=None, bvid=None):
         print(j)
         return None
 
-# 
+# 视频推荐
 # day只能3天或7天
 def rank(tid=1, day=3):
     #url = 'http://api.bilibili.com/x/web-interface/ranking/region?rid=%s&day=%s' % (tid, day)
@@ -70,3 +71,20 @@ def rank(tid=1, day=3):
     else:
         print(j)
         return []
+
+# 专栏推荐
+def article_suggestions(cid = 0, ps = 20):
+    url = 'https://api.bilibili.com/x/article/recommends?cid=%s&pn=0&ps=%s' % (cid, ps)
+    j = raw(url)
+    if j['code'] == 0:
+        articles = j['data']
+        return [a['id'] for a in articles]
+    else:
+        print(j)
+        return []
+
+# 专栏内容（纯文本）
+def article_text(cv):
+    html = pq('https://www.bilibili.com/read/cv%s' % (str(cv).replace('cv', '')))
+    return html('.article-holder').text()
+
