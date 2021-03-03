@@ -1,13 +1,12 @@
 
 
-import requests
-
-import sqlite3
+import jieba
+import jieba.analyse
+import jieba.posseg as pseg
 
 import json, re
 import argparse
-import sys
-import time, datetime, math
+import time, datetime, math, codecs, sys, requests, sqlite3
 from urllib.parse import quote, unquote
 
 import bilibiliquery as bq
@@ -39,10 +38,44 @@ def dump_comment(aid=None, bvid=None, mode=0, maxp=5):
     return res
 
 # 从数据库导出文本
-def dump_db(tid=1):
+def dump_db(fname, tid=1):
     db = SimpleDB('bili_comments.db')
-    comments = db.query("SELECT content FROM Comments WHERE tid = %s " % (tid, ))
-    return '\n'.join([unquote(comment[0]) for comment in comments])
+    if (tid == 0):
+        comments = db.iterate("SELECT content FROM Comments")
+    else:
+        comments = db.iterate("SELECT content FROM Comments WHERE tid = %s " % (tid, ))
+    comment_count = 0
+    with open(fname,'bw') as f:
+        for comment in comments:
+            comment_count += 1
+            if (comment_count % 100 == 0):
+                print('%s comments dumped           ' % comment_count, end='\r')
+            f.write((unquote(comment[0]) + '\n').encode('utf-8'))
+        print('%s comments dumped           ' % comment_count)
+    
+    db.close()
+
+# 单句分词
+def cut_words(sentence):
+    #print sentence
+    return ' '.join([w for w in jieba.cut(sentence) if len(w.strip()) > 0])
+
+# 整个文件分词
+def process_dump(fname):
+    print('word separation...')
+    f = codecs.open(fname, 'r', encoding="utf8")
+    target = codecs.open('%s-seg.txt' % ('.'.join(fname.split('.')[:-1])), 'w', encoding="utf8")
+    line_num = 1
+    line = f.readline()
+    while line:
+        if (line_num % 100 == 0):
+            print('%s lines processed            ' % line_num, end='\r')
+        target.writelines(cut_words(line) + '\n')
+        line_num += 1
+        line = f.readline()
+    print('%s lines processed            ' % (line_num-1))
+    f.close()
+    target.close()
 
 # 循环爬取 interval分钟间隔
 def scrap_start(interval=10):
@@ -84,9 +117,9 @@ def scrap_start(interval=10):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('action', metavar='action', help='fetch=爬取  dump=输出到文件')
-    parser.add_argument('-t', '--time', dest='time', default=600, type=float, help='自定义评论获取间隔时间（分钟），0表示不循环（仅fetch）')
+    parser.add_argument('-t', '--time', dest='time', default=0, type=int, help='自定义评论获取间隔时间（分钟），0表示不循环')
     parser.add_argument('-f', '--file', dest='fname', default='dump.txt', help='将结果写入文件（仅dump）')
-    parser.add_argument('-c', '--category', dest='tid', default='0', type=int, help='分区id（仅dump）')
+    parser.add_argument('-c', '--category', dest='tid', default=0, type=int, help='分区id（仅dump）')
     args = parser.parse_args()
     
     fetch = args.action != 'dump'
@@ -97,12 +130,7 @@ if __name__ == '__main__':
     else:
         fname = args.fname
         tid = args.tid
-        with open(fname,'bw') as f:
-            if (tid == 0):
-                for tid in tids:
-                    f.write(dump_db(tid).encode('utf-8'))
-            else:
-                f.write(dump_db(tid).encode('utf-8'))
-    
+        dump_db(fname, tid)
+        process_dump(fname)
 
 
