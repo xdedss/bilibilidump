@@ -23,6 +23,7 @@ def comments(aid, page=0, mode=2):
     url = 'http://api.bilibili.com/x/v2/reply/main?pn=1&type=1&mode=%s&oid=%s&next=%s' % (mode, aid, page+1)
     j = raw(url)
     if j['code'] != 0:
+        print(j)
         return []
     replies = j['data']['replies']
     if replies == None:
@@ -49,13 +50,23 @@ def vid_info(aid=None, bvid=None):
         print(j)
         return None
 
-def rank(tid=1):
-    url = 'http://api.bilibili.com/x/web-interface/ranking/region?rid=%s&day=3' % (tid, )
+# 
+# day只能3天或7天
+def rank(tid=1, day=3):
+    #url = 'http://api.bilibili.com/x/web-interface/ranking/region?rid=%s&day=%s' % (tid, day)
+#    j = raw(url)
+#    if j['code'] == 0:
+#        videos = j['data']
+#        return [v['aid'] for v in videos]
+#    else:
+#        print(j)
+#        return []
+
+    url = 'https://api.bilibili.com/x/web-interface/ranking/v2?rid=%s&type=all' % (tid, )
     j = raw(url)
     if j['code'] == 0:
-        videos = j['data']
+        videos = j['data']['list']
         return [v['aid'] for v in videos]
     else:
         print(j)
         return []
-
