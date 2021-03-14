@@ -132,6 +132,7 @@ def scrap_start(tids, interval=10):
 
 # 循环爬取推荐专栏
 # 专栏推荐可以无限刷，但是刷来刷去也就那120个专栏来回重复 最好隔一段时间再刷一次
+# 隔一天也没有太多新专栏
 def scrap_article_start():
     db = SimpleDB('bili_articles.db')
     db.execute("CREATE TABLE IF NOT EXISTS Articles (id INT PRIMARY KEY, content TEXT)")
