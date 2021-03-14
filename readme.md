@@ -5,12 +5,10 @@
 
 # 用法
 
-1.爬取，每次间隔60分钟，爬取每一个主分区的热门视频，存入bili_comments.db 
-
--t为间隔（分钟）
+1.爬取每一个主分区的热门视频，存入bili_comments.db 
 
 ```
-python bilibilidump.py fetch -t 60
+python bilibilidump.py fetch
 ```
 
 2.从bili_comments.db导出纯文本到txt
@@ -20,3 +18,17 @@ python bilibilidump.py fetch -t 60
 ```
 python bilibilidump.py dump -f dump.txt -c 0
 ```
+
+3.生成词向量 d为维数
+
+```
+python word2vec.py dump.txt -d 300
+```
+
+4.生成词云（test.png）
+
+```
+python word2cloud.py
+```
+
+![test](wordcloud.png)

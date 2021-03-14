@@ -27,5 +27,5 @@ def generate(fname, outputf, max_lines=0):
     wc.to_file(outputf)
 
 if __name__ == '__main__':
-    generate('dump.txt', 'test.png')
+    generate('dump.txt', 'wordcloud.png')
 
