@@ -71,7 +71,7 @@ def dump_articles_db(fname):
 # 单句分词
 def cut_words(sentence):
     #print sentence
-    return ' '.join([w for w in jieba.cut(sentence) if len(w.strip()) > 0])
+    return ' '.join([w.strip() for w in jieba.cut(sentence) if len(w.strip()) > 0])
 
 # 整个文件分词
 def process_dump(fname):
