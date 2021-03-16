@@ -68,14 +68,27 @@ def dump_articles_db(fname):
         print('%s articles dumped           ' % article_count)
     db.close()
 
+# 关键字分割（用于处理表情包）
+def keyword_sep(s, kws=[]):
+    for kw in kws:
+        idx = s.find(kw)
+        if (idx != -1):
+            stop2 = idx+len(kw)
+            return (keyword_sep(s[:idx]) + ' ' + s[idx:stop2] + ' ' + keyword_sep(s[stop2:]))
+    return ' '.join([w.strip() for w in jieba.cut(s) if len(w.strip()) > 0])
+
 # 单句分词
 def cut_words(sentence):
     #print sentence
+    tree = keyword_tree(sentence, kws)
     return ' '.join([w.strip() for w in jieba.cut(sentence) if len(w.strip()) > 0])
 
 # 整个文件分词
 def process_dump(fname):
     print('word separation...')
+    dic_f = open('bilidict.txt', 'r', encoding='utf8')
+    kws = [w for w in dic_f.read().split('\n') if len(w.strip()) > 0]
+    dic_f.close()
     target_fname = '%s-seg.txt' % ('.'.join(fname.split('.')[:-1]))
     f = codecs.open(fname, 'r', encoding="utf8")
     target = codecs.open(target_fname, 'w', encoding="utf8")
@@ -84,7 +97,7 @@ def process_dump(fname):
     while line:
         if (line_num % 100 == 0):
             print('%s lines processed            ' % line_num, end='\r')
-        target.writelines(cut_words(line) + '\n')
+        target.writelines(keyword_sep(line, kws) + '\n')
         line_num += 1
         line = f.readline()
     print('%s lines processed            ' % (line_num-1))
