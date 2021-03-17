@@ -74,7 +74,7 @@ def keyword_sep(s, kws=[]):
         idx = s.find(kw)
         if (idx != -1):
             stop2 = idx+len(kw)
-            return (keyword_sep(s[:idx]) + ' ' + s[idx:stop2] + ' ' + keyword_sep(s[stop2:]))
+            return (keyword_sep(s[:idx], kws) + ' ' + s[idx:stop2] + ' ' + keyword_sep(s[stop2:], kws))
     return ' '.join([w.strip() for w in jieba.cut(s) if len(w.strip()) > 0])
 
 # 单句分词
